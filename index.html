@@ -1,0 +1,287 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>index</title></head><body><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>摄像头测试工具 - Camera Test Tool</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+.container { max-width: 900px; width: 100%; background: #1a1a2e; border-radius: 20px; padding: 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); border: 1px solid #2a2a4a; }
+h1 { text-align: center; margin-bottom: 20px; font-size: 28px; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.video-wrapper { position: relative; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 15px; aspect-ratio: 16/9; }
+video { width: 100%; height: 100%; display: block; object-fit: contain; }
+#volumeBar { position: absolute; bottom: 10px; right: 10px; width: 30px; height: 80px; background: rgba(0,0,0,0.5); border-radius: 15px; padding: 5px; display: none; }
+#volumeLevel { position: absolute; bottom: 5px; left: 5px; right: 5px; background: linear-gradient(to top, #00ff88, #00ccff); border-radius: 10px; transition: height 0.1s; height: 0%; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 15px; }
+.btn { padding: 12px 16px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s; color: #fff; }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+.btn:active { transform: translateY(0); }
+.btn-start { background: linear-gradient(135deg, #667eea, #764ba2); }
+.btn-stop { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.btn-snap { background: linear-gradient(135deg, #f39c12, #e67e22); }
+.btn-full { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+.btn-record { background: linear-gradient(135deg, #e74c3c, #ff6b6b); }
+.btn-mute { background: linear-gradient(135deg, #3498db, #2980b9); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px; }
+.setting-group { display: flex; flex-direction: column; gap: 5px; }
+.setting-group label { font-size: 13px; color: #888; font-weight: 500; }
+.setting-group select { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #16213e; color: #e0e0e0; font-size: 14px; outline: none; cursor: pointer; }
+.setting-group select:focus { border-color: #667eea; }
+.info { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 12px; background: #16213e; border-radius: 10px; font-size: 13px; }
+.info-item { display: flex; flex-direction: column; gap: 2px; }
+.info-label { color: #888; font-size: 11px; }
+.info-value { color: #e0e0e0; font-weight: 500; }
+.recording-indicator { display: none; position: absolute; top: 10px; left: 10px; background: rgba(231,76,60,0.9); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+.recording-indicator .dot { display: inline-block; width: 8px; height: 8px; background: #fff; border-radius: 50%; margin-right: 6px; animation: blink 1s infinite; }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>📷 摄像头测试工具</h1>
+<div class="video-wrapper">
+<video id="video" autoplay playsinline></video>
+<div id="volumeBar"><div id="volumeLevel"></div></div>
+<div class="recording-indicator" id="recIndicator"><span class="dot"></span>录制中 <span id="recTime">0s</span></div>
+</div>
+<div class="settings">
+<div class="setting-group"><label>🎯 清晰度</label><select id="resolution"><option value="3840x2160">4K (3840×2160)</option><option value="2560x1440">2K (2560×1440)</option><option value="1920x1080" selected>1080P (1920×1080)</option><option value="1280x720">720P (1280×720)</option><option value="640x480">480P (640×480)</option><option value="320x240">240P (320×240)</option></select></div>
+<div class="setting-group"><label>⚡ 帧率</label><select id="framerate"><option value="60">60 fps</option><option value="30" selected>30 fps</option><option value="15">15 fps</option><option value="10">10 fps</option></select></div>
+<div class="setting-group"><label>📹 摄像头</label><select id="cameraSelect"><option value="">检测中...</option></select></div>
+<div class="setting-group"><label>🎤 麦克风</label><select id="micSelect"><option value="">检测中...</option></select></div>
+</div>
+<div class="controls">
+<button class="btn btn-start" id="btnStart">📷 启动</button>
+<button class="btn btn-stop" id="btnStop" disabled>■ 停止</button>
+<button class="btn btn-snap" id="btnSnap" disabled>📸 拍照</button>
+<button class="btn btn-record" id="btnRecord" disabled>🔴 录制</button>
+<button class="btn btn-mute" id="btnMute" disabled>🔊 有声</button>
+<button class="btn btn-full" id="btnFull" disabled>⛶ 全屏</button>
+</div>
+<div class="info">
+<div class="info-item"><span class="info-label">状态</span><span class="info-value" id="statusText">⏸ 未启动</span></div>
+<div class="info-item"><span class="info-label">设备</span><span class="info-value" id="deviceText">-</span></div>
+<div class="info-item"><span class="info-label">分辨率</span><span class="info-value" id="resText">-</span></div>
+<div class="info-item"><span class="info-label">帧率</span><span class="info-value" id="fpsText">-</span></div>
+<div class="info-item"><span class="info-label">音频</span><span class="info-value" id="audioText">-</span></div>
+<div class="info-item"><span class="info-label">录制</span><span class="info-value" id="recText">未录制</span></div>
+</div>
+</div>
+<script>
+const video = document.getElementById('video');
+const btnStart = document.getElementById('btnStart');
+const btnStop = document.getElementById('btnStop');
+const btnSnap = document.getElementById('btnSnap');
+const btnRecord = document.getElementById('btnRecord');
+const btnMute = document.getElementById('btnMute');
+const btnFull = document.getElementById('btnFull');
+const resSelect = document.getElementById('resolution');
+const fpsSelect = document.getElementById('framerate');
+const camSelect = document.getElementById('cameraSelect');
+const micSelect = document.getElementById('micSelect');
+const statusText = document.getElementById('statusText');
+const deviceText = document.getElementById('deviceText');
+const resText = document.getElementById('resText');
+const fpsText = document.getElementById('fpsText');
+const audioText = document.getElementById('audioText');
+const recText = document.getElementById('recText');
+const volumeBar = document.getElementById('volumeBar');
+const volumeLevel = document.getElementById('volumeLevel');
+const recIndicator = document.getElementById('recIndicator');
+const recTime = document.getElementById('recTime');
+
+let stream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+let isMuted = false;
+let audioTrack = null;
+let recStartTime = null;
+let recTimer = null;
+let fpsInterval = null;
+let frameCount = 0;
+let lastFpsTime = performance.now();
+
+async function detectDevices() {
+try {
+const devices = await navigator.mediaDevices.enumerateDevices();
+camSelect.innerHTML = '';
+micSelect.innerHTML = '';
+const cams = devices.filter(d => d.kind === 'videoinput');
+const mics = devices.filter(d => d.kind === 'audioinput');
+if(cams.length===0) camSelect.innerHTML='<option value="">未检测到摄像头</option>';
+cams.forEach((c,i) => { const o=document.createElement('option'); o.value=c.deviceId; o.text=c.label||`摄像头 ${i+1}`; camSelect.appendChild(o); });
+if(mics.length===0) micSelect.innerHTML='<option value="">未检测到麦克风</option>';
+mics.forEach((m,i) => { const o=document.createElement('option'); o.value=m.deviceId; o.text=m.label||`麦克风 ${i+1}`; micSelect.appendChild(o); });
+} catch(e) { console.log(e); }
+}
+detectDevices();
+navigator.mediaDevices.addEventListener('devicechange', detectDevices);
+
+btnStart.onclick = async () => {
+if(stream) return;
+const [w,h] = resSelect.value.split('x').map(Number);
+const fps = parseInt(fpsSelect.value);
+const camId = camSelect.value;
+const micId = micSelect.value;
+try {
+const constraints = {
+video: { width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: fps }, deviceId: camId ? { exact: camId } : undefined },
+audio: { deviceId: micId ? { exact: micId } : undefined, echoCancellation: true, noiseSuppression: true }
+};
+stream = await navigator.mediaDevices.getUserMedia(constraints);
+video.srcObject = stream;
+audioTrack = stream.getAudioTracks()[0];
+isMuted = false;
+btnStart.disabled = true;
+btnStop.disabled = false;
+btnSnap.disabled = false;
+btnRecord.disabled = false;
+btnMute.disabled = false;
+btnFull.disabled = false;
+btnMute.textContent = '🔊 有声';
+volumeBar.style.display = audioTrack ? 'block' : 'none';
+const track = stream.getVideoTracks()[0];
+const settings = track.getSettings();
+deviceText.textContent = track.label || '未知';
+resText.textContent = `${settings.width||w}×${settings.height||h}`;
+audioText.textContent = audioTrack ? '已开启' : '无麦克风';
+statusText.textContent = '✅ 运行中';
+startFpsMonitor();
+startAudioMeter();
+} catch(e) {
+statusText.textContent = '❌ 启动失败: '+e.message;
+}
+};
+
+btnStop.onclick = () => {
+stopAll();
+};
+
+btnSnap.onclick = () => {
+const canvas = document.createElement('canvas');
+canvas.width = video.videoWidth;
+canvas.height = video.videoHeight;
+canvas.getContext('2d').drawImage(video,0,0);
+const link = document.createElement('a');
+const now = new Date();
+const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+link.download = `photo_${ts}.png`;
+link.href = canvas.toDataURL('image/png');
+link.click();
+};
+
+btnRecord.onclick = () => {
+if(!isRecording) {
+recordedChunks = [];
+mediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm' });
+mediaRecorder.ondataavailable = e => { if(e.data.size>0) recordedChunks.push(e.data); };
+mediaRecorder.onstop = () => {
+const blob = new Blob(recordedChunks, { type: 'video/webm' });
+const url = URL.createObjectURL(blob);
+const link = document.createElement('a');
+const now = new Date();
+const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+link.download = `recording_${ts}.webm`;
+link.href = url;
+link.click();
+URL.revokeObjectURL(url);
+};
+mediaRecorder.start();
+isRecording = true;
+recStartTime = Date.now();
+recTimer = setInterval(() => { recTime.textContent = Math.floor((Date.now()-recStartTime)/1000)+'s'; }, 1000);
+btnRecord.textContent = '⏹️ 停止录制';
+btnRecord.style.background = 'linear-gradient(135deg,#95a5a6,#7f8c8d)';
+recIndicator.style.display = 'block';
+recText.textContent = '🎥 录制中';
+statusText.textContent = '🎥 录制中';
+} else {
+mediaRecorder.stop();
+isRecording = false;
+clearInterval(recTimer);
+btnRecord.textContent = '🔴 录制';
+btnRecord.style.background = '';
+recIndicator.style.display = 'none';
+recText.textContent = '未录制';
+statusText.textContent = '✅ 运行中';
+}
+};
+
+btnMute.onclick = () => {
+if(audioTrack) {
+isMuted = !isMuted;
+audioTrack.enabled = !isMuted;
+btnMute.textContent = isMuted ? '🔇 静音' : '🔊 有声';
+audioText.textContent = isMuted ? '已静音' : '已开启';
+}
+};
+
+btnFull.onclick = () => {
+if(video.requestFullscreen) video.requestFullscreen();
+else if(video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+};
+
+function stopAll() {
+if(mediaRecorder && isRecording) { mediaRecorder.stop(); isRecording=false; clearInterval(recTimer); btnRecord.textContent='🔴 录制'; btnRecord.style.background=''; recIndicator.style.display='none'; recText.textContent='未录制'; }
+if(stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; }
+video.srcObject = null;
+btnStart.disabled = false;
+btnStop.disabled = true;
+btnSnap.disabled = true;
+btnRecord.disabled = true;
+btnMute.disabled = true;
+btnFull.disabled = true;
+volumeBar.style.display = 'none';
+statusText.textContent = '⏸ 已停止';
+deviceText.textContent = '-';
+resText.textContent = '-';
+fpsText.textContent = '-';
+audioText.textContent = '-';
+if(fpsInterval) { clearInterval(fpsInterval); fpsInterval=null; }
+}
+
+function startFpsMonitor() {
+frameCount = 0;
+lastFpsTime = performance.now();
+if(fpsInterval) clearInterval(fpsInterval);
+fpsInterval = setInterval(() => {
+const now = performance.now();
+const elapsed = (now - lastFpsTime) / 1000;
+if(elapsed >= 0.5) {
+const fps = Math.round(frameCount / elapsed);
+fpsText.textContent = fps + ' fps';
+frameCount = 0;
+lastFpsTime = now;
+}
+}, 200);
+video.addEventListener('timeupdate', () => { frameCount++; }, { once: false });
+}
+
+function startAudioMeter() {
+if(!audioTrack) return;
+try {
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const source = audioCtx.createMediaStreamSource(stream);
+const analyser = audioCtx.createAnalyser();
+analyser.fftSize = 256;
+source.connect(analyser);
+const dataArray = new Uint8Array(analyser.frequencyBinCount);
+function update() {
+if(!stream) return;
+analyser.getByteFrequencyData(dataArray);
+let sum = 0;
+for(let i=0;i<dataArray.length;i++) sum+=dataArray[i];
+const avg = sum/dataArray.length;
+const pct = Math.min(avg/128*100, 100);
+volumeLevel.style.height = pct+'%';
+requestAnimationFrame(update);
+}
+update();
+} catch(e) { console.log('Audio meter error:', e); }
+}
+</script>
+</body>
+</html></body></html>
